@@ -38,3 +38,7 @@ def delete_item(item_id: int, db: Session = Depends(get_db)):
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     return {"ok": True}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
