@@ -1,5 +1,28 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
+
+
+# Schemas de Grupo
+class GrupoBase(BaseModel):
+    titulo: str
+
+
+class GrupoCreate(GrupoBase):
+    membro_ids: list[int] = Field(default_factory=list)
+
+
+class Grupo(GrupoBase):
+    id: int
+    criado_por_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class GrupoComMembros(Grupo):
+    membro_ids: list[int]
+
 
 # Schemas de Item
 class ItemBase(BaseModel):
@@ -17,6 +40,7 @@ class ItemUpdate(BaseModel):
 
 class Item(ItemBase):
     id: int
+    grupo_id: int | None = None
     criado_por_id: int
     comprado: bool
     created_at: datetime

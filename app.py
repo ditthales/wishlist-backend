@@ -10,8 +10,6 @@ import schemas
 import crud
 from database import SessionLocal, engine
 
-models.Base.metadata.create_all(bind=engine)
-
 app = FastAPI()
 
 # Configuração JWT
@@ -102,27 +100,79 @@ def login(user_login: schemas.UserLogin, db: Session = Depends(get_db)):
 def get_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
-# Endpoints de Item
-@app.post("/items", response_model=schemas.Item)
-def create_item(
+# Endpoints de Grupo
+@app.post("/grupos", response_model=schemas.GrupoComMembros)
+def create_group(
+    group: schemas.GrupoCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    new_group = crud.create_group(db, group, criado_por_id=current_user.id)
+    member_ids = crud.get_group_member_ids(db, new_group.id)
+    return {
+        "id": new_group.id,
+        "titulo": new_group.titulo,
+        "criado_por_id": new_group.criado_por_id,
+        "created_at": new_group.created_at,
+        "membro_ids": member_ids,
+    }
+
+
+@app.get("/grupos", response_model=list[schemas.GrupoComMembros])
+def list_my_groups(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    groups = crud.get_user_groups(db, current_user.id)
+    result = []
+    for group in groups:
+        result.append(
+            {
+                "id": group.id,
+                "titulo": group.titulo,
+                "criado_por_id": group.criado_por_id,
+                "created_at": group.created_at,
+                "membro_ids": crud.get_group_member_ids(db, group.id),
+            }
+        )
+    return result
+
+
+@app.get("/grupos/{grupo_id}/items", response_model=list[schemas.Item])
+def list_group_items(
+    grupo_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not crud.is_user_in_group(db, grupo_id, current_user.id):
+        raise HTTPException(status_code=403, detail="Acesso negado ao grupo")
+    return crud.get_group_items(db, grupo_id)
+
+
+@app.post("/grupos/{grupo_id}/items", response_model=schemas.Item)
+def create_group_item(
+    grupo_id: int,
     item: schemas.ItemCreate,
     current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    return crud.create_item(db, item, criado_por_id=current_user.id)
+    if not crud.is_user_in_group(db, grupo_id, current_user.id):
+        raise HTTPException(status_code=403, detail="Acesso negado ao grupo")
+    return crud.create_item(db, grupo_id, item, criado_por_id=current_user.id)
 
-@app.get("/items", response_model=list[schemas.Item])
-def list_items(
-    para_quem_id: int | None = None,
-    db: Session = Depends(get_db)
-):
-    return crud.get_items(db, user_id=para_quem_id)
 
+# Endpoints de Item
 @app.get("/items/{item_id}", response_model=schemas.Item)
-def get_item(item_id: int, db: Session = Depends(get_db)):
+def get_item(
+    item_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     item = crud.get_item(db, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item não encontrado")
+    if item.grupo_id is None or not crud.is_user_in_group(db, item.grupo_id, current_user.id):
+        raise HTTPException(status_code=403, detail="Acesso negado ao item")
     return item
 
 @app.put("/items/{item_id}", response_model=schemas.Item)
@@ -132,6 +182,12 @@ def update_item(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    db_item = crud.get_item(db, item_id)
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item não encontrado")
+    if db_item.grupo_id is None or not crud.is_user_in_group(db, db_item.grupo_id, current_user.id):
+        raise HTTPException(status_code=403, detail="Acesso negado ao item")
+
     item = crud.update_item(db, item_id, item_update)
     if not item:
         raise HTTPException(status_code=404, detail="Item não encontrado")
@@ -143,6 +199,12 @@ def delete_item(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    db_item = crud.get_item(db, item_id)
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item não encontrado")
+    if db_item.grupo_id is None or not crud.is_user_in_group(db, db_item.grupo_id, current_user.id):
+        raise HTTPException(status_code=403, detail="Acesso negado ao item")
+
     item = crud.delete_item(db, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item não encontrado")
