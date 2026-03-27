@@ -16,6 +16,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
 
+def get_user_by_id(db: Session, user_id: int):
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
 def create_user(db: Session, user: schemas.UserCreate):
     senha_hash = hash_password(user.senha)
     db_user = models.User(

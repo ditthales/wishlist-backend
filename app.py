@@ -100,6 +100,17 @@ def login(user_login: schemas.UserLogin, db: Session = Depends(get_db)):
 def get_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
+@app.get("/users/{id}", response_model=schemas.User)
+def get_user_by_id(
+    id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    user = crud.get_user_by_id(db, id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return user
+
 # Endpoints de Grupo
 @app.post("/grupos", response_model=schemas.GrupoComMembros)
 def create_group(
